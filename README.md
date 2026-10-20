@@ -206,3 +206,5 @@ Bills are sent to the model provider's API for reading. The prompts tell the mod
 ## Credits
 
 Built by **Javeria Iqbal** for Women Tech Quest 2026, Build with AI track. Thank you to Women Tech Quest and 10Pearls for the challenge.
+
+app link: https://appbzz7ggnjmmva9yaxwwwx.streamlit.app/
