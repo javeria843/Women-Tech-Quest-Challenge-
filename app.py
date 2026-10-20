@@ -1,4 +1,4 @@
-import os, sys, io, csv, json, html, hashlib, tempfile, subprocess
+import os, sys, io, csv, json, html, time, hashlib, tempfile, subprocess
 
 import pandas as pd
 import streamlit as st
@@ -122,10 +122,23 @@ def store_for(key):
 
 
 def run_extract(path, st_):
+    d, err = None, None
     with st.spinner("Reading the bill (Level 1)..."):
-        d = solve.retry(lambda: extract(path))
+        for i in range(3):
+            try:
+                d = extract(path)
+                break
+            except Exception as e:  # show the real reason instead of a vague message
+                err = e
+                time.sleep(5)
     if not isinstance(d, dict):
-        st.error("Could not extract this bill. Check your API key and internet connection, then try again.")
+        st.error("Could not extract this bill.")
+        if err is not None:
+            st.code("%s: %s" % (type(err).__name__, err), language="text")
+            st.caption("If this mentions an API key or permission, check the Secrets of the app. "
+                       "If it says 503 or high demand, wait a minute and try again.")
+        else:
+            st.code(("extract() returned: %r" % (d,))[:500], language="text")
         return
     st_["d"], st_["h"], st_["f"], st_["answers"] = d, None, None, {}
 
@@ -150,6 +163,20 @@ with st.sidebar:
     st.divider()
     st.caption("Model: **%s** (%s)" % (os.getenv("MODEL_NAME", "not set"), os.getenv("MODEL_PROVIDER", "not set")))
     st.caption("All counts, averages and percentages are calculated in Python. The model only reads the bill and writes the wording.")
+    with st.expander("Diagnostics"):
+        _key = os.getenv("API_KEY") or ""
+        st.write("API key set:", bool(_key), "(length %d)" % len(_key))
+        st.write("Provider / model:", os.getenv("MODEL_PROVIDER"), "/", os.getenv("MODEL_NAME"))
+        st.write("Python:", sys.version.split()[0])
+        if st.button("Test model connection"):
+            try:
+                from PIL import Image
+                _tp = os.path.join(tempfile.gettempdir(), "wtq_ping.png")
+                Image.new("RGB", (64, 64), "white").save(_tp)
+                _r = solve.ask(_tp, "Reply with the single word OK.", js=False)
+                st.success("Model replied: %s" % str(_r)[:200])
+            except Exception as e:
+                st.error("%s: %s" % (type(e).__name__, e))
 
 st.markdown(
     '<div class="hero"><h1>⚡ Utility Bill Decoder</h1>'
@@ -310,4 +337,3 @@ with tab3:
             st.dataframe(pd.DataFrame(rows), hide_index=True, height=260)
             with open(fp, "rb") as fh:
                 st.download_button("⬇ Download %s" % fname, fh.read(), file_name=fname, mime="text/csv", key="dl_" + fname)
-            
